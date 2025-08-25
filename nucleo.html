@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Simulação do Núcleo de um Átomo — HTML/JS</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#121a33; --accent:#5eead4; --accent2:#93c5fd; --text:#e5e7eb;
+      --muted:#94a3b8; --proton:#ef4444; --neutron:#a3a3a3;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#0b1020 0%,#0a0f1f 100%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Ubuntu,"Helvetica Neue",Arial}
+    h1{font-size:clamp(20px,2.6vw,32px);margin:0 0 6px 0}
+    p{margin:6px 0;color:var(--muted)}
+    a{color:var(--accent2)}
+
+    .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
+    .grid{display:grid;grid-template-columns: 320px 1fr; gap:16px}
+    @media (max-width: 950px){.grid{grid-template-columns:1fr}}
+
+    .panel{background:rgba(18,26,51,0.75);backdrop-filter: blur(6px);border:1px solid rgba(148,163,184,0.2);border-radius:16px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,0.25)}
+    .controls label{display:block;font-size:13px;margin:10px 0 6px;color:var(--muted)}
+    .controls input[type="range"]{width:100%}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .row > *{flex:1}
+    .btn{appearance:none;border:1px solid rgba(148,163,184,0.3);color:var(--text);background:#0e1530; padding:10px 12px;border-radius:12px;cursor:pointer;transition:.2s; box-shadow: inset 0 0 0 0px var(--accent)}
+    .btn:hover{transform:translateY(-1px);border-color:rgba(148,163,184,0.5)}
+    .btn.primary{background:linear-gradient(90deg, #0e1530, #0e2238); border-color:rgba(94,234,212,0.5)}
+    .btn.ghost{background:transparent}
+    .badge{display:inline-flex;align-items:center;gap:6px;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.25);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+
+    canvas{width:100%;height:70vh;min-height:420px;background:radial-gradient(1200px 600px at 50% 50%, rgba(147,197,253,0.08), transparent 60%), radial-gradient(800px 400px at 10% 10%, rgba(94,234,212,0.07), transparent 60%), radial-gradient(1000px 500px at 90% 85%, rgba(59,130,246,0.06), transparent 55%), #090e1c;
+      border:1px solid rgba(148,163,184,0.2); border-radius:16px}
+
+    .legend{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
+    .dot{width:10px;height:10px;border-radius:50%}
+    .dot.proton{background:var(--proton)}
+    .dot.neutron{background:var(--neutron)}
+    .stat{display:grid;grid-template-columns:auto 1fr; gap:6px 12px; font-size:13px;color:var(--muted)}
+    .stat strong{color:var(--text)}
+
+    .note{font-size:12px;color:#b8c1d3;line-height:1.4;margin-top:10px}
+    .divider{height:1px;background:linear-gradient(90deg,transparent,rgba(148,163,184,.25),transparent);margin:12px 0}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px dashed rgba(148,163,184,.4);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+    select, input[type="number"]{background:#0d1530;color:var(--text);border:1px solid rgba(148,163,184,0.35);border-radius:10px;padding:8px;width:100%}
+    .small{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="panel" style="margin-bottom:12px">
+      <div style="display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+        <div>
+          <h1>Simulação do núcleo atômico <span class="badge">HTML + Canvas + JS</span></h1>
+          <p>Visualize um modelo <em>didático</em> do núcleo: prótons (vermelhos) e nêutrons (cinza) interagindo via força forte (atração de curto alcance + repulsão a curtíssimo alcance) e repulsão eletrostática entre prótons.</p>
+        </div>
+        <div class="pill">⚠️ Modelo simplificado para fins educativos</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <aside class="panel controls">
+        <div class="row">
+          <div>
+            <label for="preset">Pré‑definições</label>
+            <select id="preset">
+              <option value="custom">Personalizado</option>
+              <option value="H1">Hidrogênio‑1 (1p)</option>
+              <option value="He4">Hélio‑4 (2p,2n)</option>
+              <option value="C12">Carbono‑12 (6p,6n)</option>
+              <option value="O16">Oxigênio‑16 (8p,8n)</option>
+              <option value="Fe56">Ferro‑56 (26p,30n)</option>
+            </select>
+          </div>
+          <div>
+            <label for="seed">Semente aleatória</label>
+            <input id="seed" type="number" min="0" step="1" value="0" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="protons">Prótons</label>
+            <input id="protons" type="range" min="1" max="30" value="2" />
+          </div>
+          <div>
+            <label for="neutrons">Nêutrons</label>
+            <input id="neutrons" type="range" min="0" max="34" value="2" />
+          </div>
+        </div>
+
+        <div class="divider"></div>
+        <label for="strong">Força forte (atração)</label>
+        <input id="strong" type="range" min="50" max="600" value="240" />
+
+        <label for="coreRepulse">Núcleo duro (repulsão a curtíssima distância)</label>
+        <input id="coreRepulse" type="range" min="200" max="1200" value="700" />
+
+        <label for="coulomb">Repulsão eletrostática (próton↔próton)</label>
+        <input id="coulomb" type="range" min="10" max="400" value="120" />
+
+        <label for="r0">Distância preferida (r₀)</label>
+        <input id="r0" type="range" min="12" max="40" value="22" />
+
+        <label for="cutoff">Alcance da força forte</label>
+        <input id="cutoff" type="range" min="30" max="140" value="80" />
+
+        <div class="divider"></div>
+        <label for="damping">Amortecimento (meio nuclear)</label>
+        <input id="damping" type="range" min="0" max="1" step="0.01" value="0.10" />
+
+        <label for="temp">"Temperatura" (agitação térmica)</label>
+        <input id="temp" type="range" min="0" max="80" value="10" />
+
+        <div class="divider"></div>
+        <div class="row">
+          <button id="playPause" class="btn primary">⏸︎ Pausar</button>
+          <button id="reset" class="btn">🔄 Reiniciar</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="randomKick" class="btn ghost">💥 Pequena excitação</button>
+          <button id="toggleTrails" class="btn ghost">🧵 Trilhas: off</button>
+        </div>
+
+        <div class="divider"></div>
+        <div class="legend">
+          <span class="dot proton"></span><span class="small">Próton (+)</span>
+          <span class="dot neutron"></span><span class="small">Nêutron (0)</span>
+        </div>
+
+        <div class="divider"></div>
+        <div class="stat" id="stats"></div>
+
+        <p class="note">Dicas: aumente a força forte (e o alcance) para ver ligação nuclear mais estável; aumente Coulomb para observar a repulsão entre prótons. Em núcleos maiores, o equilíbrio entre essas forças fica mais delicado.</p>
+      </aside>
+
+      <main class="panel">
+        <canvas id="sim"></canvas>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Utilidades ----------
+    function LCG(seed){ // gerador simples para reprodutibilidade
+      let s = (seed>>>0) || 1;
+      return ()=> (s = (1664525*s + 1013904223) >>> 0) / 4294967296;
+    }
+
+    const canvas = document.getElementById('sim');
+    const ctx = canvas.getContext('2d');
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    function resize(){
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // ---------- Parâmetros (DOM) ----------
+    const ui = {
+      preset: document.getElementById('preset'),
+      seed: document.getElementById('seed'),
+      protons: document.getElementById('protons'),
+      neutrons: document.getElementById('neutrons'),
+      strong: document.getElementById('strong'),
+      coreRepulse: document.getElementById('coreRepulse'),
+      coulomb: document.getElementById('coulomb'),
+      r0: document.getElementById('r0'),
+      cutoff: document.getElementById('cutoff'),
+      damping: document.getElementById('damping'),
+      temp: document.getElementById('temp'),
+      playPause: document.getElementById('playPause'),
+      reset: document.getElementById('reset'),
+      randomKick: document.getElementById('randomKick'),
+      toggleTrails: document.getElementById('toggleTrails'),
+      stats: document.getElementById('stats')
+    };
+
+    const presets = {
+      H1: {p:1, n:0},
+      He4: {p:2, n:2},
+      C12: {p:6, n:6},
+      O16: {p:8, n:8},
+      Fe56:{p:26, n:30}
+    };
+
+    // ---------- Estado da simulação ----------
+    let rng = LCG(0);
+    let running = true;
+    let showTrails = false;
+
+    const state = {
+      dt: 0.016,
+      particles: [], // {x,y,vx,vy,type: 'p'|'n', m:1, q: 1|0}
+      boundsPadding: 30,
+    };
+
+    function setSeed(v){ rng = LCG(Number(v)||0); }
+
+    function rand(min, max){ return min + (max-min) * rng(); }
+
+    function resetParticles(){
+      const P = Number(ui.protons.value|0);
+      const N = Number(ui.neutrons.value|0);
+      state.particles = [];
+      const cx = canvas.width/2, cy = canvas.height/2;
+      const radius = Math.min(canvas.width, canvas.height) * 0.18 + (P+N)*0.4;
+      for(let i=0;i<P+N;i++){
+        const ang = rand(0, Math.PI*2);
+        const r = Math.sqrt(rand(0,1)) * radius;
+        const x = cx + r*Math.cos(ang);
+        const y = cy + r*Math.sin(ang);
+        const isProton = i < P;
+        state.particles.push({
+          x, y,
+          vx: rand(-10,10), vy: rand(-10,10),
+          m: 1,
+          type: isProton ? 'p' : 'n',
+          q: isProton ? 1 : 0,
+        });
+      }
+    }
+
+    function applyPreset(name){
+      if(!presets[name]) return;
+      ui.protons.value = presets[name].p;
+      ui.neutrons.value = presets[name].n;
+      resetParticles();
+    }
+
+    // ---------- Física simplificada ----------
+    function step(){
+      const dt = state.dt;
+      const strongK = Number(ui.strong.value);
+      const coreK = Number(ui.coreRepulse.value);
+      const coulombK = Number(ui.coulomb.value);
+      const r0 = Number(ui.r0.value);
+      const cutoff = Number(ui.cutoff.value);
+      const damping = Number(ui.damping.value);
+      const temp = Number(ui.temp.value);
+
+      const ps = state.particles;
+      const n = ps.length;
+
+      // acumular forças
+      const fx = new Float32Array(n);
+      const fy = new Float32Array(n);
+
+      for(let i=0;i<n;i++){
+        for(let j=i+1;j<n;j++){
+          let dx = ps[j].x - ps[i].x;
+          let dy = ps[j].y - ps[i].y;
+          let r2 = dx*dx + dy*dy;
+          let r = Math.sqrt(r2) + 1e-6;
+          let ux = dx / r, uy = dy / r;
+
+          // Força forte: atrativa entre r0..cutoff; repulsiva se r<r0
+          if(r < cutoff){
+            let fMag = 0;
+            if(r < r0){
+              fMag += coreK * (r0 - r) / r0; // repulsão de núcleo duro
+            } else {
+              fMag -= strongK * (r - r0) / (cutoff - r0); // atração até o alcance
+            }
+            fx[i] -= fMag*ux; fy[i] -= fMag*uy;
+            fx[j] += fMag*ux; fy[j] += fMag*uy;
+          }
+
+          // Coulomb: somente próton‑próton
+          if(ps[i].q && ps[j].q){
+            const fC = coulombK / (r2 + 50); // +50 evita explosões numéricas
+            fx[i] -= fC * ux; fy[i] -= fC * uy;
+            fx[j] += fC * ux; fy[j] += fC * uy;
+          }
+        }
+      }
+
+      // Integração com amortecimento e "temperatura"
+      for(let i=0;i<n;i++){
+        // Ruído térmico (pequena excitação aleatória)
+        const th = temp*0.5;
+        fx[i] += rand(-th, th);
+        fy[i] += rand(-th, th);
+
+        // Amortecimento viscoso
+        fx[i] += -damping * ps[i].vx;
+        fy[i] += -damping * ps[i].vy;
+
+        // Atualiza velocidades e posições (semi‑implícito)
+        ps[i].vx += (fx[i] / ps[i].m) * dt;
+        ps[i].vy += (fy[i] / ps[i].m) * dt;
+        ps[i].x += ps[i].vx * dt;
+        ps[i].y += ps[i].vy * dt;
+      }
+
+      // Limites macios (mantenha tudo em ~janela)
+      const pad = state.boundsPadding * dpr;
+      for(let i=0;i<n;i++){
+        if(ps[i].x < pad) { ps[i].vx += (pad-ps[i].x)*0.05; }
+        if(ps[i].x > canvas.width-pad){ ps[i].vx -= (ps[i].x-(canvas.width-pad))*0.05; }
+        if(ps[i].y < pad) { ps[i].vy += (pad-ps[i].y)*0.05; }
+        if(ps[i].y > canvas.height-pad){ ps[i].vy -= (ps[i].y-(canvas.height-pad))*0.05; }
+      }
+    }
+
+    // ---------- Desenho ----------
+    function draw(){
+      if(!showTrails){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+      } else {
+        // Deixar um rastro suave
+        ctx.fillStyle = 'rgba(9,14,28,0.12)';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+      }
+
+      // brilho central suave
+      const g = ctx.createRadialGradient(canvas.width/2,canvas.height/2,10, canvas.width/2,canvas.height/2, Math.min(canvas.width,canvas.height)/1.8);
+      g.addColorStop(0,'rgba(147,197,253,0.06)');
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.rect(0,0,canvas.width,canvas.height); ctx.fill();
+
+      // ligações (opcional): linhas finas quando em alcance de força forte
+      const ps = state.particles; const n = ps.length;
+      ctx.lineWidth = 1.2 * dpr;
+      for(let i=0;i<n;i++){
+        for(let j=i+1;j<n;j++){
+          const dx = ps[j].x-ps[i].x, dy = ps[j].y-ps[i].y;
+          const r = Math.hypot(dx,dy);
+          if(r < Number(ui.cutoff.value)){
+            const t = (r - Number(ui.r0.value)) / (Number(ui.cutoff.value) - Number(ui.r0.value));
+            const alpha = 0.25 * (1 - Math.min(Math.max(t,0),1));
+            ctx.strokeStyle = `rgba(94,234,212,${alpha})`;
+            ctx.beginPath(); ctx.moveTo(ps[i].x, ps[i].y); ctx.lineTo(ps[j].x, ps[j].y); ctx.stroke();
+          }
+        }
+      }
+
+      // partículas
+      for(const p of ps){
+        const r = 7*dpr;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+        ctx.fillStyle = p.type==='p' ? '#ef4444' : '#a3a3a3';
+        ctx.shadowColor = p.type==='p' ? 'rgba(239,68,68,0.4)' : 'rgba(163,163,163,0.25)';
+        ctx.shadowBlur = 12;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // centro
+      ctx.beginPath();
+      ctx.arc(canvas.width/2, canvas.height/2, 2*dpr, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(147,197,253,0.6)';
+      ctx.fill();
+    }
+
+    // ---------- Stats ----------
+    function updateStats(){
+      // Energias simples
+      let ke = 0; // cinética
+      for(const p of state.particles){ ke += 0.5*p.m*(p.vx*p.vx + p.vy*p.vy); }
+      const P = Number(ui.protons.value|0); const N = Number(ui.neutrons.value|0);
+      ui.stats.innerHTML = `
+        <div>Prótons</div><div><strong>${P}</strong></div>
+        <div>Nêutrons</div><div><strong>${N}</strong></div>
+        <div>Partículas</div><div><strong>${state.particles.length}</strong></div>
+        <div>Energia cinética</div><div><strong>${ke.toFixed(1)}</strong> (u.a.)</div>
+      `;
+    }
+
+    // ---------- Loop ----------
+    let last = performance.now();
+    function loop(t){
+      if(running){
+        // integrar com passos fixos para estabilidade
+        let acc = t - last; if(acc>50) acc=50; // evita saltos ao trocar de aba
+        while(acc > 0){ step(); acc -= state.dt*1000; }
+        draw();
+        updateStats();
+      }
+      last = t; requestAnimationFrame(loop);
+    }
+
+    // ---------- Controles ----------
+    ui.playPause.addEventListener('click', ()=>{
+      running = !running;
+      ui.playPause.textContent = running ? '⏸︎ Pausar' : '▶︎ Continuar';
+      ui.playPause.classList.toggle('primary', running);
+    });
+
+    ui.reset.addEventListener('click', ()=>{ setSeed(ui.seed.value); resetParticles(); });
+    ui.randomKick.addEventListener('click', ()=>{
+      for(const p of state.particles){ p.vx += rand(-40,40); p.vy += rand(-40,40); }
+    });
+    ui.toggleTrails.addEventListener('click', ()=>{
+      showTrails = !showTrails;
+      ui.toggleTrails.textContent = showTrails ? '🧵 Trilhas: on' : '🧵 Trilhas: off';
+    });
+
+    ui.preset.addEventListener('change', (e)=>{
+      if(e.target.value === 'custom') return;
+      applyPreset(e.target.value);
+    });
+
+    // sempre que mudar números/forças, recompor suavemente (sem reset brusco)
+    ['protons','neutrons'].forEach(id=> ui[id].addEventListener('input', resetParticles));
+    ['strong','coreRepulse','coulomb','r0','cutoff','damping','temp'].forEach(id=> ui[id].addEventListener('input', ()=>{}));
+    ui.seed.addEventListener('change', ()=>{ setSeed(ui.seed.value); resetParticles(); });
+
+    // ---------- Inicialização ----------
+    setSeed(ui.seed.value);
+    applyPreset('He4'); // começa com hélio‑4
+    last = performance.now();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
